@@ -55,6 +55,7 @@ PYBIND11_MODULE(geco, handle) {
     smm.def("compute_elastic_energy", &ProductGraphGenerators::computeElasticEnergy);
     smm.def("get_rhs", &ProductGraphGenerators::getRHS);
     smm.def("get_constraint_matrix_vectors_intersections", &ProductGraphGenerators::getAleqVectors);
+    smm.def("get_constraint_matrix_vectors_orientation", &ProductGraphGenerators::getOrientVectors);
 
     smm.def("get_product_space", &ProductGraphGenerators::getProductSpace);
     smm.def("decode_result_vector", &ProductGraphGenerators::decodeResultVector);

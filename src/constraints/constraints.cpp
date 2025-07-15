@@ -2,6 +2,8 @@
 #include <vector>
 #include <set>
 #include <tsl/robin_map.h>
+#include <math.h>
+#include <igl/per_vertex_normals.h>
 
 Constraints::Constraints(Eigen::MatrixXi& EX, Eigen::MatrixXi& EY, Eigen::MatrixXi& productspace, const int numContours, Eigen::MatrixXi& SRCIds, Eigen::MatrixXi& TRGTIds, Eigen::MatrixXi& PLUSMINUSDIR, bool coupling, bool resolveCoupling, bool meanProblem) :
     EX(EX), EY(EY), productspace(productspace), numContours(numContours), SRCIds(SRCIds), TRGTIds(TRGTIds), PLUSMINUSDIR(PLUSMINUSDIR), coupling(coupling), resolveCoupling(resolveCoupling), meanProblem(meanProblem) {
@@ -264,6 +266,131 @@ std::tuple<Eigen::MatrixXi, Eigen::MatrixXi, Eigen::MatrixXi> Constraints::getLe
     I.conservativeResize(numAddedLeq, 1);
     J.conservativeResize(numAddedLeq, 1);
     V.conservativeResize(numAddedLeq, 1);
+    return std::make_tuple(I, J, V);
+}
+
+typedef std::tuple<int, int> Edge;
+
+namespace std {
+    template<> struct hash<Edge> {
+        std::size_t operator()(Edge const& edg) const noexcept {
+            return std::get<0>(edg) + 10000 + std::get<1>(edg); // this hash function should work great for our purpose
+        }
+    };
+    template<> struct equal_to<Edge>{
+        constexpr bool operator()(const Edge &lhs, const Edge &rhs) const {
+            return (std::get<0>(lhs) == std::get<0>(rhs)) && (std::get<1>(lhs) == std::get<1>(rhs));
+        }
+    };
+}
+
+
+std::tuple<Eigen::MatrixXi, Eigen::MatrixXi, Eigen::MatrixXi> Constraints::getOrientVectors(const Eigen::MatrixXd& VX,
+                                                                                            const Eigen::MatrixXd& VY,
+                                                                                            const Eigen::MatrixXi& FX,
+                                                                                            const Eigen::MatrixXi& FY,
+                                                                                            const int maxDepth,
+                                                                                            const bool angleBased) {
+    const double angleThresholdNormalInversion = M_PI_2;
+    //if (maxDepth != 0) {
+    //     std::cout << prefix << "Cannot create orientation constraints for maxDepth > 0" << std::endl;
+    //}
+    const long nnzConstraints = 100 * productspace.rows() * std::pow(maxDepth + 1, 2);
+    Eigen::MatrixXi I(nnzConstraints, 2); I.setZero();
+    Eigen::MatrixXi J(1, 1); J.setZero();
+    Eigen::MatrixXi V(1, 1); V.setZero();
+
+    tsl::robin_map<Edge, Edge> next_edge;
+    next_edge.reserve(2 * FY.rows());
+    for (int f = 0; f < FY.rows(); f++) {
+        next_edge[std::make_tuple(FY(f, 0), FY(f, 1))] = std::make_tuple(FY(f, 1), FY(f, 2));
+        next_edge[std::make_tuple(FY(f, 1), FY(f, 2))] = std::make_tuple(FY(f, 2), FY(f, 0));
+        next_edge[std::make_tuple(FY(f, 2), FY(f, 0))] = std::make_tuple(FY(f, 0), FY(f, 1));
+    }
+
+    Eigen::MatrixXd NX, NY;
+    igl::per_vertex_normals(VX, FX, NX);
+    igl::per_vertex_normals(VY, FY, NY);
+
+    long numAdded = 0;
+    int currentCurveIndex = 0, currentCurveStartIndex = 0;
+    for (int i = 0; i < productspace.rows(); i++) {
+        if (productspace(i, 6) != currentCurveIndex) {
+            currentCurveIndex = productspace(i, 6);
+            currentCurveStartIndex = i;
+        }
+        if (productspace(i, 0) == productspace(i, 1) || productspace(i, 2) == productspace(i, 3)) {
+            continue; // degenerate edges cannot have normal direction
+        }
+        const int thisEdgeSourceVertex = productspace(i, 2);
+
+        Eigen::Vector3d edgeXi;
+        std::tuple<int, int> nextEdge;
+        if (angleBased) {
+            edgeXi = VX.row(productspace(i, 3)) - VX.row(productspace(i, 2));
+            edgeXi.normalize();
+        }
+        else {
+            const auto result = next_edge.find(std::make_tuple(productspace(i, 2), productspace(i, 3)));
+            if (result == next_edge.end()) {
+                nextEdge = std::make_tuple(-1, -1);
+            }
+            else {
+                nextEdge = result.value();
+            }
+        }
+
+        for (int j = currentCurveStartIndex; j < productspace.rows(); j++) {
+            if (productspace(j, 6) != currentCurveIndex) {
+                break;
+            }
+            if (productspace(j, 0) == productspace(j, 1) || productspace(j, 2) == productspace(j, 3)) {
+                continue; // degenerate edges cannot have normal direction
+            }
+            if (productspace(i, 1) != productspace(j, 0) || productspace(i, 3) != productspace(j, 2) ) {
+                continue;
+            }
+            if (productspace(i, 2) == productspace(j, 3)) {
+                // more or less tri to edge matchings here
+                continue;
+            }
+
+
+            //std::cout << productspace.row(i) << "  <-> " << productspace.row(j) << std::endl;
+            const int connectingVertex = productspace(i, 3);
+            assert(productspace(j, 2) == connectingVertex);
+
+            if (angleBased) {
+                Eigen::Vector3d edgeXj = VX.row(productspace(j, 3)) - VX.row(productspace(j, 2));
+                edgeXj.normalize();
+
+                Eigen::Vector3d cross = edgeXi.cross(edgeXj);
+                const double crossNorm = cross.norm();
+                if (crossNorm < 1e-4) {
+                    continue;
+                }
+                cross = cross / crossNorm;
+
+                const double angle = std::abs(acos(cross.dot(NX.row(connectingVertex))));
+
+                if (angle > angleThresholdNormalInversion) {
+                    I.row(numAdded) << i, j;
+                    numAdded++;
+                }
+            }
+            else {
+                const int nextEdgeTargetVertex = std::get<1>(nextEdge);
+                if (nextEdgeTargetVertex != productspace(j, 3)) {
+                    I.row(numAdded) << i, j;
+                    numAdded++;
+                }
+            }
+        }
+    }
+
+    I.conservativeResize(numAdded, 2);
+    //J.conservativeResize(numAdded, 1);
+    //V.conservativeResize(numAdded, 1);
     return std::make_tuple(I, J, V);
 }
 

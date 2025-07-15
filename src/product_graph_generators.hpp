@@ -80,6 +80,7 @@ public:
     Eigen::MatrixXd getCostVector();
     std::tuple<Eigen::MatrixXi, Eigen::MatrixXi, Eigen::MatrixXi> getAVectors();
     std::tuple<Eigen::MatrixXi, Eigen::MatrixXi, Eigen::MatrixXi> getAleqVectors();
+    std::tuple<Eigen::MatrixXi, Eigen::MatrixXi, Eigen::MatrixXi> getOrientVectors(const Eigen::MatrixXi& FX, const Eigen::MatrixXi& FY, const bool angleBased);
     void setNormals(Eigen::MatrixXd& inormalsX, Eigen::MatrixXd& inormalsY);
     void exportInputs();
     void exportInputs(Eigen::MatrixX<bool> resultsVec);

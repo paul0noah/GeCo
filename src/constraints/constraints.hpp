@@ -40,6 +40,9 @@ public:
     Constraints(Eigen::MatrixXi& EX, Eigen::MatrixXi& EY, Eigen::MatrixXi& productspace, const int numContours, Eigen::MatrixXi& SRCIds, Eigen::MatrixXi& TRGTIds, Eigen::MatrixXi& PLUSMINUSDIR, bool coupling, bool resolveCoupling, bool meanProblem);
     std::tuple<Eigen::MatrixXi, Eigen::MatrixXi, Eigen::MatrixXi> getConstraints();
     std::tuple<Eigen::MatrixXi, Eigen::MatrixXi, Eigen::MatrixXi> getLeqConstraints(const int maxDepth);
+    std::tuple<Eigen::MatrixXi, Eigen::MatrixXi, Eigen::MatrixXi> getOrientVectors(const Eigen::MatrixXd& VX, const Eigen::MatrixXd& VY,
+                                                                                   const Eigen::MatrixXi& FX, const Eigen::MatrixXi& FY,
+                                                                                   const int maxDepth, const bool angleBased);
     Eigen::MatrixXi getRHS();
     int getNumCouplingConstr();
 

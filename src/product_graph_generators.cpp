@@ -154,6 +154,17 @@ Eigen::MatrixXi ProductGraphGenerators::getRHS() {
     return RHS;
 }
 
+std::tuple<Eigen::MatrixXi, Eigen::MatrixXi, Eigen::MatrixXi> ProductGraphGenerators::getOrientVectors(const Eigen::MatrixXi& FX,
+                                                                                                       const Eigen::MatrixXi& FY,
+                                                                                                       const bool angleBased) {
+    Constraints constr(EX, EY, productspace, numContours, SRCIds, TRGTIds, PLUSMINUSDIR, true, resolveCouple, meanProblem);
+    const auto constrVectors = constr.getOrientVectors(VX, VY, FX, FY, maxDepth, angleBased);
+    const auto AIorient = std::get<0>(constrVectors);
+    const auto AJorient = std::get<1>(constrVectors);
+    const auto AVorient = std::get<2>(constrVectors);
+    return std::make_tuple(AIorient, AJorient, AVorient);
+}
+
 std::tuple<Eigen::MatrixXi, Eigen::MatrixXi, Eigen::MatrixXi> ProductGraphGenerators::getAleqVectors() {
     if (AIleq.rows() == 0) {
         if (verbose) std::cout << prefix << "Generating non-intersection constraints..." << std::endl;
