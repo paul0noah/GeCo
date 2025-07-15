@@ -11,6 +11,9 @@
 #include "utils.hpp"
 #include <igl/per_vertex_normals.h>
 #include <igl/repmat.h>
+#include <igl/upsample.h>
+#include <igl/boundary_loop.h>
+#include <igl/boundary_facets.h>
 
 namespace utils {
 
@@ -155,6 +158,127 @@ Eigen::MatrixXd normals2d(Eigen::MatrixXd V, const Eigen::MatrixXi& E) {
 
     return vertexN;
 }
+
+std::tuple<Eigen::MatrixXd, Eigen::MatrixXi, Eigen::VectorXi, Eigen::MatrixXi, Eigen::VectorX<bool>> getSTAR(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F) {
+
+    const int originalNumVerts = (int) V.rows();
+    Eigen::MatrixXd VV;
+    Eigen::MatrixXi FF;
+    igl::upsample(V, F, VV, FF, 1);
+    const int stageTwoNumVerts = (int) VV.rows();
+
+
+    Eigen::MatrixXd VVV;
+    Eigen::MatrixXi FFF;
+    igl::upsample(VV, FF, VVV, FFF, 1);
+
+    Eigen::MatrixXi TTadjacencyFFF;
+    igl::triangle_triangle_adjacency(FFF, TTadjacencyFFF);
+
+
+    Eigen::VectorXi FFFids(FFF.rows());
+    FFFids.setConstant(-1);
+    // first loop => set triangles adjacent to original vertices
+    for (int fff = 0; fff < FFF.rows(); fff++) {
+        const int smallestVertexId = FFF.row(fff).minCoeff();
+        if (smallestVertexId < originalNumVerts) {
+            FFFids(fff) = smallestVertexId;
+        }
+    }
+
+    // second and third loop => set triangles next to already set triangles
+    for (int j = 0; j < 2; j++) {
+        Eigen::MatrixXi FFFidsCopy = FFFids;
+        for (int fff = 0; fff < FFF.rows(); fff++) {
+            for (int i = 0; i < 3; i++) {
+                const int neighbouringTriangleId = FFFids(TTadjacencyFFF(fff, i));
+                if (neighbouringTriangleId != -1) {
+                    FFFidsCopy(fff) = neighbouringTriangleId;
+                }
+            }
+        }
+        FFFids = FFFidsCopy;
+    }
+
+    // forth loop => set vetexids
+    Eigen::MatrixXi VVVids(VVV.rows(), 1);
+    VVVids.setConstant(-1);
+    for (int fff = 0; fff < FFF.rows(); fff++) {
+        for (int i = 0; i < 3; i++) {
+            if (FFFids(fff) != -1)
+                VVVids(FFF(fff, i)) = FFFids(fff);
+        }
+    }
+
+    // fith loop => determine inner tri ids
+    for (int fff = 0; fff < FFF.rows(); fff++) {
+        const int triId0 = FFFids(TTadjacencyFFF(fff, 0));
+        const int triId1 = FFFids(TTadjacencyFFF(fff, 1));
+        const int triId2 = FFFids(TTadjacencyFFF(fff, 2));
+        if (triId0 == -1 && triId1 == -1 && triId2 == -1) {
+            const int vertexId0 = VVVids(FFF(fff, 0));
+            const int vertexId1 = VVVids(FFF(fff, 1));
+            const int vertexId2 = VVVids(FFF(fff, 2));
+            Eigen::MatrixXi triIdx;
+            igl::find((F.array() == vertexId0).rowwise().sum() > 0 &&
+                      (F.array() == vertexId1).rowwise().sum() > 0 &&
+                      (F.array() == vertexId2).rowwise().sum() > 0, triIdx);
+            FFFids(fff) = originalNumVerts + triIdx(0, 0);
+            //std::cout << F.row(triIdx(0, 0)) << ", " << vertexId0 << ", " << vertexId1 << ", " << vertexId2 << ", " << std::endl;
+        }
+    }
+
+
+    // sixth loop => set final triangles
+    for (int fff = 0; fff < FFF.rows(); fff++) {
+        if (FFFids(fff) == -1) {
+            int triId = FFFids(TTadjacencyFFF(fff, 0));
+            for (int i = 1; i < 3; i++) {
+                triId = std::max(FFFids(TTadjacencyFFF(fff, i)), triId);
+            }
+            FFFids(fff) = triId;
+        }
+    }
+
+    const int numCycles = (int) (V.rows() + F.rows());
+
+
+    Eigen::MatrixXi CycEdges(FFF.rows() * 3, 2);
+    Eigen::VectorX<bool> Lable(FFF.rows() * 3);
+    Lable.setConstant(false);
+    std::vector<int> loop;
+    int numCycEdges = 0;
+    for (int c = 0; c < numCycles; c++) {
+        igl::boundary_loop(igl::slice_mask(FFF, FFFids.array() == c, 1), loop);
+        Eigen::MatrixXi boundaryEdges(loop.size(), 2);
+        for (int i = 0; i < loop.size(); i++) {
+            boundaryEdges.row(i) << loop[i], loop[(i+1) % loop.size()];
+
+            if (c < V.rows()) {
+                if (loop[i] < VV.rows()) {
+                    Lable(numCycEdges+i) = true;
+                }
+            }
+            else {
+                if (loop[i] >= VV.rows()) {
+                    Lable(numCycEdges+i) = true;
+                }
+            }
+
+        }
+
+        CycEdges.block(numCycEdges, 0, boundaryEdges.rows(), 2) = boundaryEdges;
+        numCycEdges += boundaryEdges.rows();
+        CycEdges.row(numCycEdges) << -1, -1;
+        numCycEdges++;
+    }
+    numCycEdges -= 1; // we added one -1, -1 edge too much
+    CycEdges.conservativeResize(numCycEdges, 2);
+    Lable.conservativeResize(numCycEdges, 1);
+
+    return std::make_tuple(VVV, FFF, FFFids, CycEdges, Lable);
+}
+
 
 } // namespace utils
 

@@ -208,6 +208,8 @@ typename Derived::Scalar median( const Eigen::DenseBase<Derived>& d ){
     return median(m);
 }
 
+std::tuple<Eigen::MatrixXd, Eigen::MatrixXi, Eigen::VectorXi, Eigen::MatrixXi, Eigen::VectorX<bool>> getSTAR(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F);
+
 } // namespace utils
 
 

@@ -43,6 +43,7 @@ PYBIND11_MODULE(geco, handle) {
     handle.doc() = "geco python bindings";
 
     handle.def("get_surface_cycles", &getSurfaceCycles);
+    handle.def("get_star", &utils::getSTAR);
 
     py::class_<ProductGraphGenerators, std::shared_ptr<ProductGraphGenerators>> smm(handle, "product_graph_generator");
     smm.def(py::init<Eigen::MatrixXd&, Eigen::MatrixXi&, Eigen::MatrixXd&, Eigen::MatrixXi&, Eigen::MatrixXd&>());
