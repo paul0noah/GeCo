@@ -301,11 +301,11 @@ std::tuple<Eigen::MatrixXi, Eigen::MatrixXi, Eigen::MatrixXi> Constraints::getOr
     Eigen::MatrixXi V(1, 1); V.setZero();
 
     tsl::robin_map<Edge, Edge> next_edge;
-    next_edge.reserve(2 * FY.rows());
-    for (int f = 0; f < FY.rows(); f++) {
-        next_edge[std::make_tuple(FY(f, 0), FY(f, 1))] = std::make_tuple(FY(f, 1), FY(f, 2));
-        next_edge[std::make_tuple(FY(f, 1), FY(f, 2))] = std::make_tuple(FY(f, 2), FY(f, 0));
-        next_edge[std::make_tuple(FY(f, 2), FY(f, 0))] = std::make_tuple(FY(f, 0), FY(f, 1));
+    next_edge.reserve(3 * FX.rows());
+    for (int f = 0; f < FX.rows(); f++) {
+        next_edge[std::make_tuple(FX(f, 0), FX(f, 1))] = std::make_tuple(FX(f, 1), FX(f, 2));
+        next_edge[std::make_tuple(FX(f, 1), FX(f, 2))] = std::make_tuple(FX(f, 2), FX(f, 0));
+        next_edge[std::make_tuple(FX(f, 2), FX(f, 0))] = std::make_tuple(FX(f, 0), FX(f, 1));
     }
 
     Eigen::MatrixXd NX, NY;
