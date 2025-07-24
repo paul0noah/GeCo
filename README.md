@@ -26,6 +26,7 @@ import igl
 import gurobipy as gp
 from gurobipy import GRB
 import time
+import scipy.sparse as sp
 from geco import product_graph_generator, get_surface_cycles
 
 ## TODO: load your own shapes (numpy arrays) with per-vertex features
