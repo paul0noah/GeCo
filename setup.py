@@ -103,8 +103,8 @@ class CMakeBuild(build_ext):
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       '-DBUILD_PYTHON_BINDINGS=True'
                     ]
-        if self.check_for_nvcc():
-            cmake_args += ['-DWITH_CUDA=True']
+        #if self.check_for_nvcc():
+        #    cmake_args += ['-DWITH_CUDA=True']
 
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
