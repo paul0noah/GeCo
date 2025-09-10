@@ -17,7 +17,6 @@ shape_opts = {"num_faces": 100}
 
 ## Load and downsample shapes and compute spidercurve on shape X
 VX, FX, vx, fx, vx2VX, VY, FY, vy, fy, vy2VY = shape_loader(filename1, filename2, shape_opts)
-ey, ex = get_spider_curve(vx, fx, vy, fy)
 
 ## Comptue Features and edge cost matrix
 feature_opts = get_feature_opts(dataset)
