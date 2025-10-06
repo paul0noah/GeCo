@@ -158,8 +158,19 @@ std::tuple<Eigen::MatrixXi, Eigen::MatrixXi, Eigen::MatrixXi> ProductGraphGenera
                                                                                                        const Eigen::MatrixXi& FY,
                                                                                                        const bool angleBased) {
     Constraints constr(EX, EY, productspace, numContours, SRCIds, TRGTIds, PLUSMINUSDIR, true, resolveCouple, meanProblem);
-    const auto constrVectors = constr.getOrientVectors(VX, VY, FX, FY, maxDepth, angleBased);
-    const auto AIorient = std::get<0>(constrVectors);
+    auto constrVectors = constr.getOrientVectors(VX, VY, FX, FY, maxDepth, angleBased);
+    auto AIorient = std::get<0>(constrVectors);
+    if (resolveCouple) {
+        // this is very confusing since we only write into AI in this function (AJ and AV are actually empty):
+        // while we use the couplingDecoder on Js (i.e. column indices of a constraints matrix) in other functions
+        // here we actually have only column indices in the AI matrix such that we can build the constraints
+        // x[AI[:, 0]] + x[AI[:, 1]] <= 1
+        // => AI, AJ, AV do NOT form a matrix
+        for (int i = 0; i < AIorient.rows(); i++) {
+            AIorient(i, 0) = couplingDecoder(AIorient(i, 0));
+            AIorient(i, 1) = couplingDecoder(AIorient(i, 1));
+        }
+    }
     const auto AJorient = std::get<1>(constrVectors);
     const auto AVorient = std::get<2>(constrVectors);
     return std::make_tuple(AIorient, AJorient, AVorient);
