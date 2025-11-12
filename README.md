@@ -43,7 +43,7 @@ lp_relax = True
 ## extract data
 feature_difference = np.zeros((len(vx), len(vy)))
 for i in range(0, len(vx)):
-    diff = feat_y[vy2VY, :] - feat_x[vx2VX[i], :]
+    diff = feat_y - feat_x[i, :]
     feature_difference[i, :] = np.sum(to_numpy(robust_lossfun(torch.from_numpy(diff.astype('float64')),
                                                       alpha=torch.tensor(2, dtype=torch.float64),
                                                       scale=torch.tensor(0.3, dtype=torch.float64))), axis=1)
