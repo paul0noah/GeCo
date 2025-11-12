@@ -27,6 +27,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import time
 import scipy.sparse as sp
+from utils.misc import robust_lossfun
 from geco import product_graph_generator, get_surface_cycles
 
 ## TODO: load your own shapes (numpy arrays) with per-vertex features
@@ -42,7 +43,10 @@ lp_relax = True
 ## extract data
 feature_difference = np.zeros((len(vx), len(vy)))
 for i in range(0, len(vx)):
-    feature_difference[i, :] = np.linalg.norm(feat_y - feat_x[i, :], axis=1)
+    diff = feat_y[vy2VY, :] - feat_x[vx2VX[i], :]
+    feature_difference[i, :] = np.sum(to_numpy(robust_lossfun(torch.from_numpy(diff.astype('float64')),
+                                                      alpha=torch.tensor(2, dtype=torch.float64),
+                                                      scale=torch.tensor(0.3, dtype=torch.float64))), axis=1)
 fx, _ = igl.orient_outward(vx, fx, np.ones_like(fx)[:, 0])
 ey = igl.edges(fy)
 ey = np.row_stack((ey, ey[:, [1, 0]]))
@@ -86,6 +90,11 @@ result_vec = x.X
 ## retrieve results
 # point map is [indices_in_x, corresponding_indices_in_y]
 point_map = np.unique(product_space[result_vec.astype('bool'), :-1][:, [0, 2]], axis=0)
+feature_difference = feature_difference.T
+cost = feature_difference[point_map[:, 1], point_map[:, 0]]
+point_map = point_map[np.lexsort((point_map[:, 0], cost))]
+_, idx = np.unique(point_map[:, 0], return_index=True)
+point_map = point_map[idx, :]
 ```
 
 # 🎓 Attribution
